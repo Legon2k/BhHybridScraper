@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 18
+VisualStudioVersion = 18.4.11626.88 stable
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BhHybridScraper", "BhHybridScraper.csproj", "{D572A8EE-435B-E1EF-F035-09131FB71360}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{D572A8EE-435B-E1EF-F035-09131FB71360}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D572A8EE-435B-E1EF-F035-09131FB71360}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D572A8EE-435B-E1EF-F035-09131FB71360}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D572A8EE-435B-E1EF-F035-09131FB71360}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {8E1C176C-CAAF-4BDC-93FE-19AD6A003C26}
+	EndGlobalSection
+EndGlobal
