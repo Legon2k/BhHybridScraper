@@ -6,22 +6,27 @@ using System.Threading.Tasks;
 using Microsoft.Playwright;
 using HtmlAgilityPack;
 
+// Ensure console handles UTF-8 characters properly
 Console.OutputEncoding = System.Text.Encoding.UTF8;
+
+// Read execution mode from command line arguments (default is "reviews")
 string mode = args.Length > 0 ? args[0].ToLower() : "reviews";
 
+// Keep only one URL uncommented for debugging purposes
 var urls = new List<string>
 {
     "https://www.bhphotovideo.com/c/product/1955563-REG/samsung_sm_x230nzatxar_11_galaxy_tab_a11.html",
-    // "https://www.bhphotovideo.com/c/product/1850005-REG/lenovo_zadg0016us_11_tab_m11_multi_touch.html"
+    // "https://www.bhphotovideo.com/c/product/1850005-REG/lenovo_zadg0016us_11_tab_m11_multi_touch.html",
+    // "https://www.bhphotovideo.com/c/product/1898558-REG/samsung_sm_x920nzaaxar_14_6_galaxy_tab_s10.html"
 };
 
-Console.WriteLine($"Режим: [{mode.ToUpper()}]. Подключаемся к вашему живому Google Chrome...");
+Console.WriteLine($"Execution Mode: [{mode.ToUpper()}]. Connecting to your live Google Chrome instance...");
 
 using var playwright = await Playwright.CreateAsync();
 
 // =====================================================================
-// ГЛАВНАЯ МАГИЯ: Подключаемся к уже открытому реальному Chrome!
-// (Убедитесь, что запустили chrome.exe --remote-debugging-port=9222)
+// CORE MAGIC: Connect to an already running instance of Chrome!
+// (Make sure you launched it with: chrome.exe --remote-debugging-port=9222)
 // =====================================================================
 IBrowser browser;
 try
@@ -30,13 +35,13 @@ try
 }
 catch (Exception)
 {
-    Console.WriteLine("❌ ОШИБКА: Не удалось подключиться к Chrome.");
-    Console.WriteLine("Убедитесь, что вы закрыли все окна Chrome и запустили его командой:");
-    Console.WriteLine("chrome.exe --remote-debugging-port=9222");
+    Console.WriteLine("❌ ERROR: Failed to connect to Chrome via CDP.");
+    Console.WriteLine("Make sure you closed all Chrome windows and launched it using:");
+    Console.WriteLine("chrome.exe --remote-debugging-port=9222 --user-data-dir=\"C:\\ChromeDebug\"");
     return;
 }
 
-// Берем первую открытую вкладку или создаем новую
+// Get the first open context and create a new page/tab
 var context = browser.Contexts[0];
 var page = await context.NewPageAsync();
 var parser = new BhParser(); 
@@ -47,12 +52,21 @@ var scrapedReviews = new Dictionary<string, List<Review>>();
 foreach (var url in urls)
 {
     Console.WriteLine($"\n========================================");
-    Console.WriteLine($"Обработка товара: {url}");
+    Console.WriteLine($"Processing product: {url}");
     
+    // In any mode, we first visit the product page
     await page.GotoAsync(url, new PageGotoOptions { WaitUntil = WaitUntilState.DOMContentLoaded });
     
-    try { await page.WaitForSelectorAsync("h1[data-selenium='productTitle']", new PageWaitForSelectorOptions { Timeout = 60000 }); }
-    catch { Console.WriteLine("⚠️ Товар не загрузился (или вы не решили капчу)."); continue; }
+    Console.WriteLine("⏳ Waiting for product page to load...");
+    try 
+    { 
+        await page.WaitForSelectorAsync("h1[data-selenium='productTitle']", new PageWaitForSelectorOptions { Timeout = 60000 }); 
+    }
+    catch 
+    { 
+        Console.WriteLine("⚠️ Timeout exceeded. Product didn't load (or CAPTCHA wasn't solved)."); 
+        continue; 
+    }
 
     await Task.Delay(3000); 
 
@@ -61,7 +75,7 @@ foreach (var url in urls)
         var productInfo = parser.ParseProductInfoJsonLd(await page.ContentAsync(), url);
         if (productInfo != null && !string.IsNullOrEmpty(productInfo.BhNumber))
         {
-            Console.WriteLine($"✅ Найден: {productInfo.FullName} | Цена: {productInfo.Price}");
+            Console.WriteLine($"✅ Found: {productInfo.FullName} | Price: {productInfo.Price}");
             scrapedInfo.Add(productInfo);
         }
     }
@@ -70,37 +84,37 @@ foreach (var url in urls)
         var productInfo = parser.ParseProductInfoJsonLd(await page.ContentAsync(), url);
         if (productInfo == null) continue;
 
-        Console.WriteLine("Ищем ссылку на отзывы...");
+        Console.WriteLine("Looking for the reviews link...");
         var reviewsLink = page.Locator("a:has(span[data-selenium='reviewsNumber'])").First;
 
         if (await reviewsLink.IsVisibleAsync())
         {
-            Console.WriteLine("Открываем отзывы (JS-клик)...");
+            Console.WriteLine("Clicking on the reviews link (JS evaluation)...");
             await reviewsLink.EvaluateAsync("el => el.click()");
             
-            Console.WriteLine("⏳ Ожидаем список отзывов...");
+            Console.WriteLine("⏳ Waiting for the reviews list to render...");
             try
             {
                 await page.WaitForSelectorAsync("div[data-selenium='reviewsClientReview']", new PageWaitForSelectorOptions { Timeout = 30000 });
-                Console.WriteLine("Отзывы на экране!");
+                Console.WriteLine("Reviews rendered successfully!");
             }
             catch (TimeoutException)
             {
-                Console.WriteLine("⚠️ Отзывы так и не появились.");
+                Console.WriteLine("⚠️ Reviews did not appear on the screen.");
                 continue; 
             }
 
             await Task.Delay(3000); 
 
-            Console.WriteLine("Ищем кнопку 'Load More'...");
-            int maxClicks = 5; 
+            Console.WriteLine("Looking for the 'Load More' button...");
+            int maxClicks = 5; // Adjust this limit as needed
             for (int i = 0; i < maxClicks; i++)
             {
                 var loadMoreBtn = page.Locator("button:has-text('Load More'), button:has-text('Show More'), button:has-text('Load more')").First;
 
                 if (await loadMoreBtn.IsVisibleAsync())
                 {
-                    Console.WriteLine($"Подгружаем отзывы {i + 1}/{maxClicks}...");
+                    Console.WriteLine($"Loading more reviews {i + 1}/{maxClicks}...");
                     await loadMoreBtn.EvaluateAsync("el => el.click()");
                     await Task.Delay(Random.Shared.Next(3000, 5000)); 
                 }
@@ -112,33 +126,40 @@ foreach (var url in urls)
 
             string reviewsHtml = await page.ContentAsync();
             var reviews = parser.ParseReviewsFromHtml(reviewsHtml);
-            Console.WriteLine($"✅ Отзывов извлечено: {reviews.Count}");
+            Console.WriteLine($"✅ Extracted reviews: {reviews.Count}");
             
             scrapedReviews[url] = reviews;
         }
+        else
+        {
+            Console.WriteLine("⚠️ Reviews link not found on the page.");
+        }
     }
 
-    await Task.Delay(Random.Shared.Next(3000, 6000));
+    int nextProductDelay = Random.Shared.Next(3000, 6000);
+    Console.WriteLine($"Waiting {nextProductDelay / 1000} sec before the next product...");
+    await Task.Delay(nextProductDelay);
 }
 
+// SAVE RESULTS DEPENDING ON THE MODE
 var jsonOptions = new JsonSerializerOptions { WriteIndented = true };
 if (mode == "info")
 {
     await File.WriteAllTextAsync("products_info.json", JsonSerializer.Serialize(scrapedInfo, jsonOptions));
-    Console.WriteLine("\n🎉 Данные сохранены в 'products_info.json'.");
+    Console.WriteLine("\n🎉 Data saved to 'products_info.json'.");
 }
 else if (mode == "reviews")
 {
     await File.WriteAllTextAsync("products_reviews.json", JsonSerializer.Serialize(scrapedReviews, jsonOptions));
-    Console.WriteLine("\n🎉 Отзывы сохранены в 'products_reviews.json'.");
+    Console.WriteLine("\n🎉 Reviews saved to 'products_reviews.json'.");
 }
 
-// ВАЖНО: Мы закрываем только вкладку, которую создали, сам ваш браузер останется открытым!
+// IMPORTANT: We only close the page we created, the main browser stays open!
 await page.CloseAsync();
-await browser.CloseAsync();
+Console.WriteLine("Scraping finished. Tab closed.");
 
 // ==========================================
-// КЛАСС ПАРСЕРА
+// PARSER CLASS
 // ==========================================
 public class BhParser
 {
@@ -147,6 +168,7 @@ public class BhParser
         var doc = new HtmlDocument();
         doc.LoadHtml(html);
 
+        // Find all hidden SEO data scripts
         var scriptNodes = doc.DocumentNode.SelectNodes("//script[@type='application/ld+json']");
         if (scriptNodes == null) return null;
 
@@ -157,6 +179,7 @@ public class BhParser
                 using var jsonDoc = JsonDocument.Parse(node.InnerText);
                 var root = jsonDoc.RootElement;
 
+                // We need the block where @type is "Product"
                 if (root.TryGetProperty("@type", out var typeProp) && typeProp.GetString() == "Product")
                 {
                     string fullName = root.GetProperty("name").GetString() ?? "";
@@ -184,7 +207,7 @@ public class BhParser
                     return new ProductInfo(url, shortName, fullName, bhNumber, mfrNumber, imageUrl, price, reviewCount, rating);
                 }
             }
-            catch { }
+            catch { /* Ignore parsing errors from unrelated JSON blocks */ }
         }
         return null;
     }
@@ -210,6 +233,7 @@ public class BhParser
                 string fullText = string.IsNullOrEmpty(title) ? content : $"{title}: {content}";
                 fullText = System.Net.WebUtility.HtmlDecode(fullText);
 
+                // Count SVG stars to determine the rating
                 var starsNode = node.SelectNodes(".//*[@data-selenium='ratingContainer']//*[local-name()='svg']");
                 int rating = starsNode?.Count ?? 5; 
 
@@ -221,12 +245,16 @@ public class BhParser
                     Date: date
                 ));
             }
-            catch { }
+            catch { /* Skip broken review blocks */ }
         }
 
         return reviews;
     }
 }
 
+// ==========================================
+// DATA MODELS
+// ==========================================
 public record ProductInfo(string ProductUrl, string ShortName, string FullName, string BhNumber, string MfrNumber, string ImageUrl, string Price, int ReviewCount, double Rating);
 public record Review(string Id, string Author, int Rating, string Text, string Date);
+public record ProductData(ProductInfo Info, List<Review> Reviews);
