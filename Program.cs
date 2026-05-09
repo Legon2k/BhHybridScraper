@@ -20,24 +20,39 @@ var urls = new List<string>
     // "https://www.bhphotovideo.com/c/product/1898558-REG/samsung_sm_x920nzaaxar_14_6_galaxy_tab_s10.html"
 };
 
-Console.WriteLine($"Execution Mode: [{mode.ToUpper()}]. Connecting to your live Google Chrome instance...");
+// =====================================================================
+// DOCKER ENVIRONMENT SETUP
+// =====================================================================
+bool isRunningInDocker = Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER") == "true";
+
+// Use host.docker.internal if in Docker, otherwise localhost
+string cdpUrl = isRunningInDocker 
+    ? "http://host.docker.internal:9222" 
+    : "http://localhost:9222";
+
+// Save to 'out' folder in Docker (to map as Volume), otherwise current directory
+string outputDir = isRunningInDocker ? "out" : ".";
+if (isRunningInDocker && !Directory.Exists(outputDir))
+{
+    Directory.CreateDirectory(outputDir);
+}
+
+Console.WriteLine($"Execution Mode: [{mode.ToUpper()}]");
+Console.WriteLine($"Environment: {(isRunningInDocker ? "Docker Container" : "Local Machine")}");
+Console.WriteLine($"Connecting to Chrome CDP at: {cdpUrl}");
 
 using var playwright = await Playwright.CreateAsync();
 
-// =====================================================================
-// CORE MAGIC: Connect to an already running instance of Chrome!
-// (Make sure you launched it with: chrome.exe --remote-debugging-port=9222)
-// =====================================================================
 IBrowser browser;
 try
 {
-    browser = await playwright.Chromium.ConnectOverCDPAsync("http://localhost:9222");
+    browser = await playwright.Chromium.ConnectOverCDPAsync(cdpUrl);
 }
 catch (Exception)
 {
     Console.WriteLine("❌ ERROR: Failed to connect to Chrome via CDP.");
     Console.WriteLine("Make sure you closed all Chrome windows and launched it using:");
-    Console.WriteLine("chrome.exe --remote-debugging-port=9222 --user-data-dir=\"C:\\ChromeDebug\"");
+    Console.WriteLine("chrome.exe --remote-debugging-port=9222 --remote-allow-origins=\"*\" --user-data-dir=\"C:\\ChromeDebug\"");
     return;
 }
 
@@ -143,15 +158,18 @@ foreach (var url in urls)
 
 // SAVE RESULTS DEPENDING ON THE MODE
 var jsonOptions = new JsonSerializerOptions { WriteIndented = true };
+
 if (mode == "info")
 {
-    await File.WriteAllTextAsync("products_info.json", JsonSerializer.Serialize(scrapedInfo, jsonOptions));
-    Console.WriteLine("\n🎉 Data saved to 'products_info.json'.");
+    string filePath = Path.Combine(outputDir, "products_info.json");
+    await File.WriteAllTextAsync(filePath, JsonSerializer.Serialize(scrapedInfo, jsonOptions));
+    Console.WriteLine($"\n🎉 Data saved to '{filePath}'.");
 }
 else if (mode == "reviews")
 {
-    await File.WriteAllTextAsync("products_reviews.json", JsonSerializer.Serialize(scrapedReviews, jsonOptions));
-    Console.WriteLine("\n🎉 Reviews saved to 'products_reviews.json'.");
+    string filePath = Path.Combine(outputDir, "products_reviews.json");
+    await File.WriteAllTextAsync(filePath, JsonSerializer.Serialize(scrapedReviews, jsonOptions));
+    Console.WriteLine($"\n🎉 Reviews saved to '{filePath}'.");
 }
 
 // IMPORTANT: We only close the page we created, the main browser stays open!
