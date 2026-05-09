@@ -9,47 +9,46 @@ using HtmlAgilityPack;
 // Ensure console handles UTF-8 characters properly
 Console.OutputEncoding = System.Text.Encoding.UTF8;
 
-// Read execution mode from command line arguments (default is "reviews")
-string mode = args.Length > 0 ? args[0].ToLower() : "reviews";
-
-// Keep only one URL uncommented for debugging purposes
+// List of products to scrape
 var urls = new List<string>
 {
     "https://www.bhphotovideo.com/c/product/1955563-REG/samsung_sm_x230nzatxar_11_galaxy_tab_a11.html",
-    // "https://www.bhphotovideo.com/c/product/1850005-REG/lenovo_zadg0016us_11_tab_m11_multi_touch.html",
-    // "https://www.bhphotovideo.com/c/product/1898558-REG/samsung_sm_x920nzaaxar_14_6_galaxy_tab_s10.html"
+    "https://www.bhphotovideo.com/c/product/1850005-REG/lenovo_zadg0016us_11_tab_m11_multi_touch.html",
+    "https://www.bhphotovideo.com/c/product/1898558-REG/samsung_sm_x920nzaaxar_14_6_galaxy_tab_s10.html"
 };
 
 // =====================================================================
-// DOCKER ENVIRONMENT SETUP
+// DOCKER / REMOTE ENVIRONMENT SETUP
 // =====================================================================
 bool isRunningInDocker = Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER") == "true";
 
-string cdpUrl = "http://localhost:9222";
-string outputDir = ".";
+string cdpUrl = Environment.GetEnvironmentVariable("CDP_URL");
 
-if (isRunningInDocker)
+if (string.IsNullOrEmpty(cdpUrl))
 {
-    outputDir = "out";
-    if (!Directory.Exists(outputDir))
+    if (isRunningInDocker)
     {
-        Directory.CreateDirectory(outputDir);
+        try
+        {
+            var ips = System.Net.Dns.GetHostAddresses("host.docker.internal");
+            cdpUrl = $"http://{ips[0]}:9222"; 
+        }
+        catch { cdpUrl = "http://host.docker.internal:9222"; }
     }
-
-    // МАГИЯ: Chrome выдает Ошибку 500, если в URL есть буквы (host.docker.internal).
-    // Ему нужен только голый IP. Поэтому мы на лету превращаем домен в IP-адрес!
-    try
+    else
     {
-        var ips = System.Net.Dns.GetHostAddresses("host.docker.internal");
-        cdpUrl = $"http://{ips[0]}:9222"; // Теперь URL выглядит как http://192.168.X.X:9222
-    }
-    catch
-    {
-        cdpUrl = "http://host.docker.internal:9222"; // Фолбэк на всякий случай
+        cdpUrl = "http://localhost:9222";
     }
 }
 
-Console.WriteLine($"Execution Mode:[{mode.ToUpper()}]");
+string outputDir = isRunningInDocker ? "out" : ".";
+if (isRunningInDocker && !Directory.Exists(outputDir))
+{
+    Directory.CreateDirectory(outputDir);
+}
+
+string outputFile = Path.Combine(outputDir, "products_data.json");
+
 Console.WriteLine($"Environment: {(isRunningInDocker ? "Docker Container" : "Local Machine")}");
 Console.WriteLine($"Connecting to Chrome CDP at: {cdpUrl}");
 
@@ -60,58 +59,57 @@ try
 {
     browser = await playwright.Chromium.ConnectOverCDPAsync(cdpUrl);
 }
-catch (Exception ex)
+catch (Exception)
 {
     Console.WriteLine("❌ ERROR: Failed to connect to Chrome via CDP.");
-    Console.WriteLine($"🔍 Details: {ex.Message}");
-    Console.WriteLine("Make sure you closed all Chrome windows and launched it using:");
-    Console.WriteLine("chrome.exe --remote-debugging-port=9222 --remote-allow-origins=\"*\" --user-data-dir=\"C:\\ChromeDebug\"");
+    Console.WriteLine("Make sure you launched Chrome using:");
+    Console.WriteLine("chrome.exe --remote-debugging-port=9222 --remote-debugging-address=0.0.0.0 --remote-allow-origins=\"*\" --user-data-dir=\"C:\\ChromeDebug\"");
     return;
 }
 
-// Get the first open context and create a new page/tab
 var context = browser.Contexts[0];
 var page = await context.NewPageAsync();
 var parser = new BhParser(); 
 
-var scrapedInfo = new List<ProductInfo>();
-var scrapedReviews = new Dictionary<string, List<Review>>(); 
+var allProductsData = new List<ProductData>();
+var jsonOptions = new JsonSerializerOptions { WriteIndented = true };
 
 foreach (var url in urls)
 {
     Console.WriteLine($"\n========================================");
     Console.WriteLine($"Processing product: {url}");
     
-    // In any mode, we first visit the product page
+    // 1. LOAD PRODUCT PAGE
     await page.GotoAsync(url, new PageGotoOptions { WaitUntil = WaitUntilState.DOMContentLoaded });
     
-    Console.WriteLine("⏳ Waiting for product page to load...");
+    Console.WriteLine("⏳ Waiting for product page to load (Solve CAPTCHA if it appears)...");
     try 
     { 
-        await page.WaitForSelectorAsync("h1[data-selenium='productTitle']", new PageWaitForSelectorOptions { Timeout = 60000 }); 
+        await page.WaitForSelectorAsync("h1[data-selenium='productTitle']", new PageWaitForSelectorOptions { Timeout = 120000 }); 
     }
     catch 
     { 
-        Console.WriteLine("⚠️ Timeout exceeded. Product didn't load (or CAPTCHA wasn't solved)."); 
+        Console.WriteLine("⚠️ Timeout exceeded. Product didn't load."); 
         continue; 
     }
 
     await Task.Delay(3000); 
 
-    if (mode == "info")
+    // 2. EXTRACT BASIC PRODUCT INFO
+    var productInfo = parser.ParseProductInfoJsonLd(await page.ContentAsync(), url);
+    if (productInfo == null || string.IsNullOrEmpty(productInfo.BhNumber))
     {
-        var productInfo = parser.ParseProductInfoJsonLd(await page.ContentAsync(), url);
-        if (productInfo != null && !string.IsNullOrEmpty(productInfo.BhNumber))
-        {
-            Console.WriteLine($"✅ Found: {productInfo.FullName} | Price: {productInfo.Price}");
-            scrapedInfo.Add(productInfo);
-        }
+        Console.WriteLine("⚠️ Failed to parse basic info. Skipping...");
+        continue;
     }
-    else if (mode == "reviews")
-    {
-        var productInfo = parser.ParseProductInfoJsonLd(await page.ContentAsync(), url);
-        if (productInfo == null) continue;
 
+    Console.WriteLine($"✅ Found: {productInfo.FullName}");
+    Console.WriteLine($"Price: {productInfo.Price} | Total Reviews: {productInfo.ReviewCount}");
+
+    // 3. NAVIGATE TO REVIEWS AND EXTRACT
+    var reviews = new List<Review>();
+    if (productInfo.ReviewCount > 0)
+    {
         Console.WriteLine("Looking for the reviews link...");
         var reviewsLink = page.Locator("a:has(span[data-selenium='reviewsNumber'])").First;
 
@@ -123,40 +121,37 @@ foreach (var url in urls)
             Console.WriteLine("⏳ Waiting for the reviews list to render...");
             try
             {
-                await page.WaitForSelectorAsync("div[data-selenium='reviewsClientReview']", new PageWaitForSelectorOptions { Timeout = 30000 });
+                await page.WaitForSelectorAsync("div[data-selenium='reviewsClientReview']", new PageWaitForSelectorOptions { Timeout = 60000 });
                 Console.WriteLine("Reviews rendered successfully!");
+                
+                await Task.Delay(3000); 
+
+                Console.WriteLine("Looking for the 'Load More' button...");
+                int maxClicks = 5; // Limit pagination clicks to avoid scraping thousands of reviews
+                for (int i = 0; i < maxClicks; i++)
+                {
+                    var loadMoreBtn = page.Locator("button:has-text('Load More'), button:has-text('Show More'), button:has-text('Load more')").First;
+
+                    if (await loadMoreBtn.IsVisibleAsync())
+                    {
+                        Console.WriteLine($"Loading more reviews {i + 1}/{maxClicks}...");
+                        await loadMoreBtn.EvaluateAsync("el => el.click()");
+                        await Task.Delay(Random.Shared.Next(3000, 5000)); 
+                    }
+                    else
+                    {
+                        break; 
+                    }
+                }
+
+                string reviewsHtml = await page.ContentAsync();
+                reviews = parser.ParseReviewsFromHtml(reviewsHtml);
+                Console.WriteLine($"✅ Extracted reviews: {reviews.Count}");
             }
             catch (TimeoutException)
             {
                 Console.WriteLine("⚠️ Reviews did not appear on the screen.");
-                continue; 
             }
-
-            await Task.Delay(3000); 
-
-            Console.WriteLine("Looking for the 'Load More' button...");
-            int maxClicks = 5; // Adjust this limit as needed
-            for (int i = 0; i < maxClicks; i++)
-            {
-                var loadMoreBtn = page.Locator("button:has-text('Load More'), button:has-text('Show More'), button:has-text('Load more')").First;
-
-                if (await loadMoreBtn.IsVisibleAsync())
-                {
-                    Console.WriteLine($"Loading more reviews {i + 1}/{maxClicks}...");
-                    await loadMoreBtn.EvaluateAsync("el => el.click()");
-                    await Task.Delay(Random.Shared.Next(3000, 5000)); 
-                }
-                else
-                {
-                    break; 
-                }
-            }
-
-            string reviewsHtml = await page.ContentAsync();
-            var reviews = parser.ParseReviewsFromHtml(reviewsHtml);
-            Console.WriteLine($"✅ Extracted reviews: {reviews.Count}");
-            
-            scrapedReviews[url] = reviews;
         }
         else
         {
@@ -164,30 +159,21 @@ foreach (var url in urls)
         }
     }
 
-    int nextProductDelay = Random.Shared.Next(3000, 6000);
+    // 4. COMBINE AND SAVE ITERATIVELY
+    allProductsData.Add(new ProductData(productInfo, reviews));
+    
+    // Save to disk after every successful product to prevent data loss on crash
+    await File.WriteAllTextAsync(outputFile, JsonSerializer.Serialize(allProductsData, jsonOptions));
+    Console.WriteLine($"💾 Data appended and saved to '{outputFile}'");
+
+    // Random delay before the next product to mimic human behavior
+    int nextProductDelay = Random.Shared.Next(5000, 10000);
     Console.WriteLine($"Waiting {nextProductDelay / 1000} sec before the next product...");
     await Task.Delay(nextProductDelay);
 }
 
-// SAVE RESULTS DEPENDING ON THE MODE
-var jsonOptions = new JsonSerializerOptions { WriteIndented = true };
-
-if (mode == "info")
-{
-    string filePath = Path.Combine(outputDir, "products_info.json");
-    await File.WriteAllTextAsync(filePath, JsonSerializer.Serialize(scrapedInfo, jsonOptions));
-    Console.WriteLine($"\n🎉 Data saved to '{filePath}'.");
-}
-else if (mode == "reviews")
-{
-    string filePath = Path.Combine(outputDir, "products_reviews.json");
-    await File.WriteAllTextAsync(filePath, JsonSerializer.Serialize(scrapedReviews, jsonOptions));
-    Console.WriteLine($"\n🎉 Reviews saved to '{filePath}'.");
-}
-
-// IMPORTANT: We only close the page we created, the main browser stays open!
 await page.CloseAsync();
-Console.WriteLine("Scraping finished. Tab closed.");
+Console.WriteLine("\n🎉 Scraping finished successfully. Tab closed.");
 
 // ==========================================
 // PARSER CLASS
@@ -199,7 +185,6 @@ public class BhParser
         var doc = new HtmlDocument();
         doc.LoadHtml(html);
 
-        // Find all hidden SEO data scripts
         var scriptNodes = doc.DocumentNode.SelectNodes("//script[@type='application/ld+json']");
         if (scriptNodes == null) return null;
 
@@ -210,7 +195,6 @@ public class BhParser
                 using var jsonDoc = JsonDocument.Parse(node.InnerText);
                 var root = jsonDoc.RootElement;
 
-                // We need the block where @type is "Product"
                 if (root.TryGetProperty("@type", out var typeProp) && typeProp.GetString() == "Product")
                 {
                     string fullName = root.GetProperty("name").GetString() ?? "";
@@ -264,7 +248,6 @@ public class BhParser
                 string fullText = string.IsNullOrEmpty(title) ? content : $"{title}: {content}";
                 fullText = System.Net.WebUtility.HtmlDecode(fullText);
 
-                // Count SVG stars to determine the rating
                 var starsNode = node.SelectNodes(".//*[@data-selenium='ratingContainer']//*[local-name()='svg']");
                 int rating = starsNode?.Count ?? 5; 
 
