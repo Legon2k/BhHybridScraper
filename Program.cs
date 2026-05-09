@@ -25,19 +25,31 @@ var urls = new List<string>
 // =====================================================================
 bool isRunningInDocker = Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER") == "true";
 
-// Use host.docker.internal if in Docker, otherwise localhost
-string cdpUrl = isRunningInDocker 
-    ? "http://host.docker.internal:9222" 
-    : "http://localhost:9222";
+string cdpUrl = "http://localhost:9222";
+string outputDir = ".";
 
-// Save to 'out' folder in Docker (to map as Volume), otherwise current directory
-string outputDir = isRunningInDocker ? "out" : ".";
-if (isRunningInDocker && !Directory.Exists(outputDir))
+if (isRunningInDocker)
 {
-    Directory.CreateDirectory(outputDir);
+    outputDir = "out";
+    if (!Directory.Exists(outputDir))
+    {
+        Directory.CreateDirectory(outputDir);
+    }
+
+    // МАГИЯ: Chrome выдает Ошибку 500, если в URL есть буквы (host.docker.internal).
+    // Ему нужен только голый IP. Поэтому мы на лету превращаем домен в IP-адрес!
+    try
+    {
+        var ips = System.Net.Dns.GetHostAddresses("host.docker.internal");
+        cdpUrl = $"http://{ips[0]}:9222"; // Теперь URL выглядит как http://192.168.X.X:9222
+    }
+    catch
+    {
+        cdpUrl = "http://host.docker.internal:9222"; // Фолбэк на всякий случай
+    }
 }
 
-Console.WriteLine($"Execution Mode: [{mode.ToUpper()}]");
+Console.WriteLine($"Execution Mode:[{mode.ToUpper()}]");
 Console.WriteLine($"Environment: {(isRunningInDocker ? "Docker Container" : "Local Machine")}");
 Console.WriteLine($"Connecting to Chrome CDP at: {cdpUrl}");
 
@@ -48,9 +60,10 @@ try
 {
     browser = await playwright.Chromium.ConnectOverCDPAsync(cdpUrl);
 }
-catch (Exception)
+catch (Exception ex)
 {
     Console.WriteLine("❌ ERROR: Failed to connect to Chrome via CDP.");
+    Console.WriteLine($"🔍 Details: {ex.Message}");
     Console.WriteLine("Make sure you closed all Chrome windows and launched it using:");
     Console.WriteLine("chrome.exe --remote-debugging-port=9222 --remote-allow-origins=\"*\" --user-data-dir=\"C:\\ChromeDebug\"");
     return;

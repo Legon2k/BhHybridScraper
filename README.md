@@ -1,79 +1,65 @@
-# 🛒 B&H Photo Video Scraper & AI Analyzer
+# 🛒 B&H Photo Video Scraper & AI Analyzer (Dockerized)
 
-A robust C# (.NET 8) console application designed to scrape product details and customer reviews from B&H Photo Video. 
+A robust, enterprise-grade C# (.NET 8/10) console application designed to scrape product details and customer reviews from B&H Photo Video. 
 
-This project was built with a specific goal: **to collect high-quality, structured review data to feed into Large Language Models (LLMs) for AI-driven sentiment analysis** (e.g., generating "Pros, Cons, and Final Verdict" summaries).
+This project was built to collect high-quality, structured review data to feed into Large Language Models (LLMs) for AI-driven sentiment analysis (e.g., generating "Pros, Cons, and Final Verdict" summaries).
 
 ## ✨ Key Features
 
-* **Advanced Anti-Bot Bypass:** Defeats strict anti-scraping systems (like PerimeterX/DataDome) by using **Playwright** to connect to a live, human-driven Google Chrome instance via CDP (Chrome DevTools Protocol). No CAPTCHA loops!
-* **SEO JSON-LD Parsing:** Uses `HtmlAgilityPack` to extract core product data directly from hidden `application/ld+json` scripts. This makes the scraper highly resilient to visual UI changes.
-* **Dynamic Content Extraction:** Automatically handles React-based pagination by locating and clicking "Load More" buttons to aggregate reviews.
-* **Dual Execution Modes:** Run the scraper in `info` mode (basic specs & prices) or `reviews` mode (deep scraping of user feedback).
-* **AI-Ready Output:** Exports data into clean, minified JSON files, perfectly structured for prompt engineering and OpenAI/Claude APIs.
+* **Split Architecture (Docker + Host):** The scraper runs inside an isolated Docker container but connects to a live Google Chrome instance on the Host OS via CDP (Chrome DevTools Protocol).
+* **Advanced Anti-Bot Bypass:** Completely defeats strict anti-scraping systems (like PerimeterX/DataDome). By using a real, human-driven Chrome profile on the host machine, we avoid the CAPTCHA loops that trap standard headless browsers.
+* **Smart DNS Resolution Hack:** Automatically resolves `host.docker.internal` to a bare IP address to bypass Chrome's strict Host header security checks (avoiding the infamous `HTTP 500` DevTools error).
+* **SEO JSON-LD Parsing:** Uses `HtmlAgilityPack` to extract core product data directly from hidden `application/ld+json` scripts, making the scraper highly resilient to visual UI changes.
+* **Dynamic React Content Extraction:** Automatically handles pagination by locating and triggering "Load More" buttons via JavaScript evaluation to aggregate reviews without triggering mouse-movement heuristics.
+* **AI-Ready Output:** Exports data into clean, minified JSON files, mapped directly to the Host OS via Docker Volumes.
 
 ## 🛠️ Tech Stack
 
-* **C# 12 / .NET 8.0**
-* **[Microsoft.Playwright](https://playwright.dev/dotnet/)** - For browser automation, DOM interaction, and CDP connection.
+* **C# / .NET**
+* **Docker**
+* **[Microsoft.Playwright](https://playwright.dev/dotnet/)** - For DOM interaction and CDP connection.
 * **[HtmlAgilityPack](https://html-agility-pack.net/)** - For lightning-fast HTML parsing and XPath querying.
-* **System.Text.Json** - For high-performance JSON serialization/deserialization.
 
 ## 🚀 Getting Started
 
 ### 1. Prerequisites
-* Install [.NET 8 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/8.0).
-* Ensure Google Chrome is installed on your machine.
+* Install[Docker Desktop](https://www.docker.com/products/docker-desktop/).
+* Ensure Google Chrome is installed on your host machine.
 
-### 2. Setup
-Clone the repository and install the required dependencies:
-```bash
-git clone https://github.com/yourusername/bh-scraper.git
-cd bh-scraper
-dotnet restore
-dotnet build
-```
+### 2. The Magic Step: Launch Chrome in Debug Mode (On Host OS)
+Because B&H uses aggressive anti-bot protection, we must run the browser on the host machine and open a debugging port for Docker.
 
-### 3. The Magic Step: Launch Chrome in Debug Mode
-Because B&H uses aggressive anti-bot protection, standard headless browsers will be blocked (403 Forbidden). We bypass this by connecting the script to a real, isolated Chrome profile.
+**Close ALL existing Chrome windows**, open your terminal (Command Prompt / PowerShell), and run:
 
-**Close all existing Chrome windows**, open your terminal (Command Prompt / PowerShell), and run:
+**For Windows:**
 ```cmd
-# For Windows
-chrome.exe --remote-debugging-port=9222 --user-data-dir="C:\ChromeDebug"
-
-# For macOS
-/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9222 --user-data-dir="~/ChromeDebug"
+chrome.exe --remote-debugging-port=9222 --remote-debugging-address=0.0.0.0 --remote-allow-origins="*" --user-data-dir="C:\ChromeDebug"
 ```
-*Note: Keep this browser window open. The script will attach to it automatically.*
-
-### 4. Run the Scraper
-Open a new terminal window in the project folder and run the app. You can pass arguments to choose the scraping mode:
-
-**To scrape basic product info only:**
+**For macOS:**
 ```bash
-dotnet run -- info
+/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9222 --remote-debugging-address=0.0.0.0 --remote-allow-origins="*" --user-data-dir="~/ChromeDebug"
 ```
-*(Outputs to `products_info.json`)*
+*Note: Keep this browser window open. If prompted by Windows Defender Firewall, click **Allow**.*
 
-**To scrape products and their reviews (Default):**
+### 3. Build the Docker Image
+Open a new terminal in the project folder and build the scraper:
 ```bash
-dotnet run -- reviews
+docker build -t bh-scraper .
 ```
-*(Outputs to `products_reviews.json`)*
 
-## 🏗️ Project Architecture
+### 4. Run the Scraper via Docker
+Run the container, map the host network, and mount an output volume so the JSON files are saved to your local machine:
 
-This project uses a hybrid scraping approach to maximize both stealth and performance:
-1. **Transport Layer (Playwright):** Controls a live Chrome instance. Navigates pages, triggers JS events, and handles "Load More" buttons seamlessly.
-2. **Parsing Layer (HtmlAgilityPack):** Playwright extracts the raw HTML string and passes it to HAP. HAP uses precise XPath queries and JSON-LD deserialization to parse the data in milliseconds without consuming heavy browser resources.
+**For Windows (PowerShell) / macOS / Linux:**
+```powershell
+docker run --rm --add-host=host.docker.internal:host-gateway -v "${PWD}/out:/app/out" bh-scraper reviews
+```
 
-## 🔮 Future Roadmap (AI Integration)
+**For Windows (Command Prompt - cmd):**
+```cmd
+docker run --rm --add-host=host.docker.internal:host-gateway -v "%cd%\out:/app/out" bh-scraper reviews
+```
 
-- [ ] **SQLite Migration:** Move from JSON files to SQLite using Entity Framework Core for better data filtering (e.g., fetching only 1-star and 5-star reviews).
-- [ ] **OpenAI Integration:** Implement `Microsoft.Extensions.AI` to send scraped reviews directly to ChatGPT/Claude to generate a "Should I Buy This?" summary.
-- [ ] **Data Cleaning:** Pre-process review texts to remove HTML entities and optimize token usage before sending them to the LLM context window.
-
-## ⚠️ Disclaimer
-
-This project is intended for **educational purposes only**. Web scraping may violate the Terms of Service of some websites. Always scrape responsibly, respect `robots.txt`, and avoid overloading servers with aggressive request rates. The authors are not responsible for any misuse of this software.
+### Execution Modes
+You can change the last word of the docker command to switch modes:
+* `reviews` (Default) - Scrapes products and deeply extracts user feedback. Out
