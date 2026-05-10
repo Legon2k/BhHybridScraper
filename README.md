@@ -1,5 +1,7 @@
 # 🛒 B&H Photo Video Scraper & AI Analyzer (Dockerized)
 
+> NOTE: The project has been renamed and reorganized. The main project is now `BhHybridScraper.Core` and lives in `src/BhHybridScraper.Core/`. The Dockerfile and build scripts were updated to reference `BhHybridScraper.Core` and the container entrypoint `BhHybridScraper.Core.dll`.
+
 A robust, enterprise-grade C# (.NET 10) console application designed to scrape product details and customer reviews from B&H Photo Video in a single, unified pipeline. 
 
 This project was built to collect high-quality, structured review data to feed into Large Language Models (LLMs) for AI-driven sentiment analysis (e.g., generating "Pros, Cons, and Final Verdict" summaries).

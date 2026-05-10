@@ -7,14 +7,14 @@ WORKDIR /src
 
 # Copy only the project file first to cache NuGet dependencies
 # Replace 'BhHybridScraper.csproj' with your actual project file name if it differs
-COPY ["src/BhHybridScraper/BhHybridScraper.csproj", "./"]
-RUN dotnet restore "./BhHybridScraper.csproj"
+COPY ["src/BhHybridScraper.Core/BhHybridScraper.Core.csproj", "./"]
+RUN dotnet restore "./BhHybridScraper.Core.csproj"
 
 # Copy the rest of the application code
 COPY . .
 
 # Build and publish the application in Release mode
-RUN dotnet publish "src/BhHybridScraper/BhHybridScraper.csproj" -c Release -o /app/publish /p:UseAppHost=false
+RUN dotnet publish "src/BhHybridScraper.Core/BhHybridScraper.Core.csproj" -c Release -o /app/publish /p:UseAppHost=false
 
 # ==========================================
 # STAGE 2: Runtime environment
@@ -37,4 +37,4 @@ ENV DOTNET_RUNNING_IN_CONTAINER=true
 
 # Define the entry point for the container. 
 # You can override the default argument ("reviews") when running the container.
-ENTRYPOINT ["dotnet", "BhHybridScraper.dll"]
+ENTRYPOINT ["dotnet", "BhHybridScraper.Core.dll"]
