@@ -7,14 +7,14 @@ WORKDIR /src
 
 # Copy only the project file first to cache NuGet dependencies
 # Replace 'BhHybridScraper.csproj' with your actual project file name if it differs
-COPY ["BhHybridScraper.csproj", "./"]
+COPY ["src/BhHybridScraper/BhHybridScraper.csproj", "./"]
 RUN dotnet restore "./BhHybridScraper.csproj"
 
 # Copy the rest of the application code
 COPY . .
 
 # Build and publish the application in Release mode
-RUN dotnet publish "BhHybridScraper.csproj" -c Release -o /app/publish /p:UseAppHost=false
+RUN dotnet publish "src/BhHybridScraper/BhHybridScraper.csproj" -c Release -o /app/publish /p:UseAppHost=false
 
 # ==========================================
 # STAGE 2: Runtime environment

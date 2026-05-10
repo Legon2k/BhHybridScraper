@@ -1,9 +1,22 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 18
-VisualStudioVersion = 18.4.11626.88 stable
+VisualStudioVersion = 18.4.11626.88
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BhHybridScraper", "BhHybridScraper.csproj", "{D572A8EE-435B-E1EF-F035-09131FB71360}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BhHybridScraper", "src\BhHybridScraper\BhHybridScraper.csproj", "{8BA15F83-0CAE-A3B2-6269-23C3DEE68A42}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{4598D21E-BFA3-408E-A5EF-B5D8AB6D1451}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "out", "out", "{ED48F23B-450C-492D-BB24-A20FE93E1615}"
+	ProjectSection(SolutionItems) = preProject
+		out\products_data.json = out\products_data.json
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{0B6087ED-6917-42B0-AD0B-F1F8BF2D1CA0}"
+	ProjectSection(SolutionItems) = preProject
+		Dockerfile = Dockerfile
+		README.md = README.md
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -11,13 +24,16 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{D572A8EE-435B-E1EF-F035-09131FB71360}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{D572A8EE-435B-E1EF-F035-09131FB71360}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{D572A8EE-435B-E1EF-F035-09131FB71360}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{D572A8EE-435B-E1EF-F035-09131FB71360}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8BA15F83-0CAE-A3B2-6269-23C3DEE68A42}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8BA15F83-0CAE-A3B2-6269-23C3DEE68A42}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8BA15F83-0CAE-A3B2-6269-23C3DEE68A42}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8BA15F83-0CAE-A3B2-6269-23C3DEE68A42}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{8BA15F83-0CAE-A3B2-6269-23C3DEE68A42} = {4598D21E-BFA3-408E-A5EF-B5D8AB6D1451}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {8E1C176C-CAAF-4BDC-93FE-19AD6A003C26}
