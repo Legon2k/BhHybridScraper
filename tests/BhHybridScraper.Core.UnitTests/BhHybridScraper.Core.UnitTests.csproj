@@ -7,8 +7,10 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.5.0" />
     <PackageReference Include="xunit" Version="2.6.2" />
-    <PackageReference Include="xunit.runner.visualstudio" Version="2.6.5" />
-    <PackageReference Include="coverlet.collector" Version="4.0.1" />
+    <!-- Use latest compatible test runner to avoid NU1603 warnings resolved by the SDK -->
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.0" />
+    <!-- Use a newer coverlet.collector version resolved by NuGet to avoid NU1603 warnings -->
+    <PackageReference Include="coverlet.collector" Version="6.0.0" />
   </ItemGroup>
 
   <ItemGroup>
