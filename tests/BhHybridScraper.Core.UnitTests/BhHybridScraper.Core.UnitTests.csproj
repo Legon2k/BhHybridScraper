@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.5.0" />
+    <PackageReference Include="xunit" Version="2.6.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.6.5" />
+    <PackageReference Include="coverlet.collector" Version="4.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\BhHybridScraper.Core\BhHybridScraper.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Include shared fixtures stored at ../fixtures and copy them into the test output
+         under the path 'tests\fixtures\...' so File.ReadAllText("tests/fixtures/...") works. -->
+    <None Include="..\fixtures\**\*">
+      <Link>tests\fixtures\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+</Project>
