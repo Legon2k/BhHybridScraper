@@ -61,6 +61,7 @@ public class BhParser
         var reviewNodes = doc.DocumentNode.SelectNodes("//div[@data-selenium='reviewsClientReview']");
         if (reviewNodes == null) return reviews;
 
+
         foreach (var node in reviewNodes)
         {
             try
@@ -75,6 +76,7 @@ public class BhParser
 
                 var starsNode = node.SelectNodes(".//*[@data-selenium='ratingContainer']//*[local-name()='svg']");
                 int rating = starsNode?.Count ?? 5; 
+
 
                 reviews.Add(new Review(
                     Id: Guid.NewGuid().ToString("N").Substring(0, 8),

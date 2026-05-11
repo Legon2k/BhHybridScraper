@@ -49,7 +49,7 @@ if (isRunningInDocker && !Directory.Exists(outputDir))
 
 string outputFile = Path.Combine(outputDir, "products_data.json");
 
-Console.WriteLine($"Environment: {(isRunningInDocker ? "Docker Container" : "Local Machine")}");
+Console.WriteLine($"Environment: {(isRunningInDocker ? "Docker Container" : "Local Machine")} ");
 Console.WriteLine($"Connecting to Chrome CDP at: {cdpUrl}");
 
 using var playwright = await Playwright.CreateAsync();
@@ -93,7 +93,7 @@ foreach (var url in urls)
         continue; 
     }
 
-    await Task.Delay(3000); 
+    await Task.Delay(3000);
 
     // 2. EXTRACT BASIC PRODUCT INFO
     var productInfo = parser.ParseProductInfoJsonLd(await page.ContentAsync(), url);
@@ -124,7 +124,7 @@ foreach (var url in urls)
                 await page.WaitForSelectorAsync("div[data-selenium='reviewsClientReview']", new PageWaitForSelectorOptions { Timeout = 60000 });
                 Console.WriteLine("Reviews rendered successfully!");
                 
-                await Task.Delay(3000); 
+                await Task.Delay(3000);
 
                 Console.WriteLine("Looking for the 'Load More' button...");
                 int maxClicks = 5; // Limit pagination clicks to avoid scraping thousands of reviews
@@ -140,7 +140,7 @@ foreach (var url in urls)
                     }
                     else
                     {
-                        break; 
+                break; 
                     }
                 }
 
@@ -174,4 +174,3 @@ foreach (var url in urls)
 
 await page.CloseAsync();
 Console.WriteLine("\n🎉 Scraping finished successfully. Tab closed.");
-

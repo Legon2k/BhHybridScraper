@@ -1,8 +1,13 @@
 # 🛒 B&H Photo Video Scraper & AI Analyzer (Dockerized)
 
+> NOTE: The project has been renamed and reorganized. The main project is now `BhHybridScraper.Core` and lives in `src/BhHybridScraper.Core/`.
+
 A robust, enterprise-grade C# (.NET 10) console application designed to scrape product details and customer reviews from B&H Photo Video in a single, unified pipeline. 
 
 This project was built to collect high-quality, structured review data to feed into Large Language Models (LLMs) for AI-driven sentiment analysis (e.g., generating "Pros, Cons, and Final Verdict" summaries).
+
+
+[![.NET CI](https://github.com/Legon2k/BhHybridScraper/actions/workflows/dotnet.yml/badge.svg)](https://github.com/Legon2k/BhHybridScraper/actions/workflows/dotnet.yml)
 
 ## ✨ Key Features
 
@@ -72,3 +77,19 @@ docker run --rm -e CDP_URL="http://192.168.1.15:9222" -v "${PWD}/out:/app/out" b
 ## ⚠️ Disclaimer
 
 This project is intended for **educational purposes only**. Web scraping may violate the Terms of Service of some websites. Always scrape responsibly and avoid overloading servers with aggressive request rates.
+
+## ✅ Unit tests
+
+A test project `tests\BhHybridScraper.Core.UnitTests` was added to validate parsing logic (uses xUnit). Key details:
+
+- Test project target: `.NET 10` (same TFM as the main code).
+- Fixtures (HTML samples) are stored in `tests/fixtures` and are configured to be copied to the test output so tests can read them via the relative path `tests/fixtures/...` at runtime.
+- Tests exercise `BhParser` behavior: `ParseProductInfoJsonLd` and `ParseReviewsFromHtml`.
+
+How to run tests:
+
+- From the command line (PowerShell):
+  - `dotnet test tests\BhHybridScraper.Core.UnitTests\BhHybridScraper.Core.UnitTests.csproj`
+- From Visual Studio: open Test Explorer and run the tests for `BhHybridScraper.Core.UnitTests`.
+
+If a test reports a missing fixture, ensure the project has been rebuilt so the fixtures are copied to the test output directory (rebuild or run `dotnet build` before `dotnet test`).
